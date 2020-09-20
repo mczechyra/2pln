@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,8 +18,12 @@ import (
 // GET https://api.exchangeratesapi.io/latest?base=PLN
 // RESP {"rates":{"EUR":0.2273088901,"USD":0.2683608756,"GBP":0.203452822,...},"base":"PLN","date":"2020-08-27"}
 
-// file name of the cache in temp folder
-const name = "2pln_cache.txt"
+const (
+	// file name of the cache in temp folder
+	name = "2pln_cache.txt"
+	// url to api.exchangeratesapi.io
+	apiURL = "https://api.exchangeratesapi.io/latest?base=PLN"
+)
 
 // file path to cache file inside temp folder
 var cacheFileName = filepath.Join(os.TempDir(), name)
@@ -37,13 +42,13 @@ func main() {
 	}
 
 	// store data with currency in JSON format
-	var rawJson []byte
+	var rawJSON []byte
 
 	// check for temp data insice system temp dir:
-	rawJson = checkForCache()
+	rawJSON = checkForCache()
 
 	// current currency data
-	var r respCurr
+	var rc respCurr
 
 	currVal, err := strconv.ParseFloat(os.Args[1], 64)
 	if err != nil {
@@ -53,37 +58,70 @@ func main() {
 
 	currType := strings.ToUpper(os.Args[2])
 
-	if len(rawJson) > 0 {
-		if err := json.Unmarshal(rawJson, &r); err != nil {
+	if len(rawJSON) > 0 {
+		if err := json.Unmarshal(rawJSON, &rc); err != nil {
 			log.Fatalf("Can't unmarchal json data: %v", err)
 			return
 		}
-		printResult(r, currVal, currType)
+		printResult(rc, currVal, currType)
 		return
 	}
 
 	// read current data from exchangeratesapi:
-	resp, err := http.Get("https://api.exchangeratesapi.io/latest?base=PLN")
-	defer resp.Body.Close()
-	if err != nil {
-		log.Fatalf("could not dowload currenc data: %v", err)
-		return
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// temporary type to pass data back from goroutine:
+	type respResult struct {
+		resp *http.Response
+		err  error
 	}
 
-	rawJson, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("can not read body: %v", err)
-		return
-	}
+	chanResp := make(chan respResult)
+	go func() {
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			chanResp <- respResult{
+				resp: nil,
+				err:  fmt.Errorf("can not create request: %v", err),
+			}
+		}
+		req = req.WithContext(ctx)
+		httpClient := &http.Client{}
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			chanResp <- respResult{
+				resp: nil,
+				err:  fmt.Errorf("could not dowload currency data: %v", err),
+			}
+		}
+		chanResp <- respResult{resp: resp, err: nil}
+	}()
 
-	if err := json.Unmarshal(rawJson, &r); err != nil {
-		log.Fatalf("Can't unmarchal json data: %v", err)
-		return
-	}
-	printResult(r, currVal, currType)
+	select {
+	case rr := <-chanResp:
+		defer rr.resp.Body.Close()
+		if rr.err != nil {
+			log.Fatal(err)
+			return
+		}
+		rawJSON, err = ioutil.ReadAll(rr.resp.Body)
+		if err != nil {
+			log.Fatalf("can not read body: %v", err)
+			return
+		}
 
-	if err := saveCache(rawJson); err != nil {
-		log.Printf("can not update cache: %v", err)
+		if err := json.Unmarshal(rawJSON, &rc); err != nil {
+			log.Fatalf("Can't unmarchal json data: %v", err)
+			return
+		}
+		printResult(rc, currVal, currType)
+
+		if err := saveCache(rawJSON); err != nil {
+			log.Printf("can not update cache: %v", err)
+		}
+	case <-ctx.Done():
+		log.Fatal("context deadline exceeded")
 	}
 }
 
@@ -130,7 +168,7 @@ func checkForCache() []byte {
 	if !cacheTime.Equal(localTime) {
 		return []byte{}
 	}
-	return buf.Next(10 * 1024)
+	return buf.Next(buf.Len())
 }
 
 func saveCache(b []byte) error {
