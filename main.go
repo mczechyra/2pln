@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,8 @@ import (
 )
 
 func main() {
+	flagTimeout := flag.Int("timeout", 5, "timeout for request")
+
 	userInput := strings.Join(os.Args[1:], " ")
 	userReq, err := decodeUserInput(userInput)
 	if err != nil {
@@ -25,7 +28,7 @@ func main() {
 	// Użyj danych z NBP:
 	var apiProvider = api.NbpApiProvider{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*flagTimeout)*time.Second)
 	defer cancel()
 
 	resp, err := apiProvider.GetCurrentRate(ctx, userReq)
@@ -96,7 +99,7 @@ const info = `
 2pln converts given currency to Polish zloty [PLN].
 Default source of data is NBP (National Polish Bank)
 Example of use:
-.\2pln.exe {AMOUNT} {CURRENCY}
+.\2pln.exe {AMOUNT} {CURRENCY} (TIMEOUT)
 where:
   AMOUNT are digits with or without coma or dot.
   valid AMOUNT options are: 
@@ -110,8 +113,14 @@ where:
     - GBP
     - CHF
 
+  TIMEOUT is optional paramter for set request timeout.
+  Default value for timeout is set as 5.
+  Timeout have to be set as last parameter!
+  To set your own timeout write: -timeout=10
+  
 Example of use:
 .\2pln.exe 10 EUR
+.\2pln.exe 12 USD -timeout 1
 
 Sample output:
 2022-01-28; 1 EUR = 4.5697 PLN; 10.0000 EUR = 45.6970 PLN`
