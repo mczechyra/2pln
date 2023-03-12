@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -40,10 +39,7 @@ var _ ApiProvider = NbpApiProvider{}
 
 type NbpApiProvider struct{}
 
-func (nbp NbpApiProvider) GetCurrentRate(req UserRequest) (ApiResponce, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+func (nbp NbpApiProvider) GetCurrentRate(ctx context.Context, req UserRequest) (ApiResponce, error) {
 	type getResult struct {
 		resp ApiResponce
 		err  error

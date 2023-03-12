@@ -23,10 +23,10 @@ You can use git for this:
 	go build
 
 ## Extendig:
-Main concept for this simple app is simple golang ApiProvider interface.
+Main concept for this simple app is ApiProvider interface.
 
 	type ApiProvider interface {
-		GetCurrentRate(UserRequest) (ApiResponce, error)
+		GetCurrentRate(context.Context, UserRequest) (ApiResponce, error)
 	}
 
 By implement it for your own types you could add more data providers.

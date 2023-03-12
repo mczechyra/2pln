@@ -1,5 +1,7 @@
 package api
 
+import "context"
+
 // UserRequest represents data provided by user.
 type UserRequest struct {
 	Value float64
@@ -16,5 +18,5 @@ type ApiResponce struct {
 
 // ApiProvider is common interfece for all apis.
 type ApiProvider interface {
-	GetCurrentRate(UserRequest) (ApiResponce, error)
+	GetCurrentRate(context.Context, UserRequest) (ApiResponce, error)
 }

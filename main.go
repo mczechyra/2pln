@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mczechyra/2pln/api"
 )
@@ -23,7 +25,10 @@ func main() {
 	// Użyj danych z NBP:
 	var apiProvider = api.NbpApiProvider{}
 
-	resp, err := apiProvider.GetCurrentRate(userReq)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	resp, err := apiProvider.GetCurrentRate(ctx, userReq)
 	if err != nil {
 		fmt.Println(info)
 		log.Println(err)
