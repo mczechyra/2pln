@@ -19,6 +19,10 @@ func main() {
 	flagTimeout := flag.Int("timeout", 5, "timeout for request")
 
 	userInput := strings.Join(os.Args[1:], " ")
+	if len(userInput) == 0 {
+		fmt.Println(info)
+		return
+	}
 	userReq, err := decodeUserInput(userInput)
 	if err != nil {
 		fmt.Printf("%s\nbłąd dekodowania danych wejściowych: %v\n", info, err)
