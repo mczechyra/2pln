@@ -31,7 +31,7 @@ type nbpResp struct {
 type rate struct {
 	NbpNum string  `json:"no"`            // "219/A/NBP/2021"
 	Date   string  `json:"effectiveDate"` // data kursu np: "2021-11-12"
-	Value  float64 `json:"mid"`           //	wartość waluty np: 4.0559
+	Value  float64 `json:"mid"`           // wartość waluty np: 4.0559
 }
 
 // NbpApiProvider have to implemet ApiProvider interface:
@@ -39,20 +39,36 @@ var _ ApiProvider = NbpApiProvider{}
 
 type NbpApiProvider struct{}
 
-func (nbp NbpApiProvider) GetCurrentRate(ctx context.Context, req UserRequest) (ApiResponce, error) {
+func (nbp NbpApiProvider) GetCurrentRate(ctx context.Context, reqData UserRequest) (ApiResponce, error) {
 	type getResult struct {
 		resp ApiResponce
 		err  error
 	}
-	resp := make(chan getResult)
+	resp := make(chan getResult, 1)
 
 	go func() {
-		httpResp, err := http.Get(getApiCall(req))
+		req, err := http.NewRequest("GET", getApiCall(reqData), nil)
+		if err != nil {
+			resp <- getResult{ApiResponce{}, errors.Wrap(err, "nie mogę utworzyć żądania http")}
+			return
+		}
+		req.Header.Add("User-Agent", "2pln")
+		req.Header.Add("Accept", "*/*")
+
+		client := &http.Client{}
+		httpResp, err := client.Do(req)
+		defer httpResp.Body.Close()
+
 		if err != nil {
 			resp <- getResult{ApiResponce{}, errors.Wrap(err, "błąd pobrania danych z NBP (http.Get)")}
 			return
 		}
-		defer httpResp.Body.Close()
+
+		if httpResp.StatusCode != http.StatusOK {
+			s := fmt.Sprintf("status odpowiedzi: %s", httpResp.Status)
+			resp <- getResult{ApiResponce{}, fmt.Errorf(s)}
+			return
+		}
 
 		body, err := ioutil.ReadAll(httpResp.Body)
 		if err != nil {
